@@ -1,19 +1,4 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-package javaapplication17;
-
-/**
- *
- * @author estudiante
- */
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.*;
-import java.util.List;
 
 public class GeneticAlgorithm {
     private int populationSize;
@@ -22,10 +7,10 @@ public class GeneticAlgorithm {
     private List<Individual> population;
     private int generation;
     private Individual best;
-    private List<List<Individual>> history; 
-    private Map<Integer, Double> avgFitnessPerGeneration;
-    private PriorityQueue<Individual> topIndividuals;
-    
+
+    private Queue<List<Individual>> recentHistory;
+    private final int MAX_HISTORY = 10;
+
     public GeneticAlgorithm(int populationSize, double mutationRate, int geneLength) {
         this.populationSize = populationSize;
         this.mutationRate = mutationRate;
@@ -33,21 +18,16 @@ public class GeneticAlgorithm {
         this.population = new ArrayList<>();
         this.generation = 0;
 
-        this.history = new ArrayList<>();
-        this.avgFitnessPerGeneration = new HashMap<>();
-        this.topIndividuals = new PriorityQueue<>(5, Comparator.comparingInt(Individual::getFitness));
-        history = new ArrayList<>();
-        history.add(new ArrayList<>(population)); 
-        initPopulation();
-        calculateAverageFitness();
-        updateTopIndividuals();
+        this.recentHistory = new LinkedList<>();
+        initializePopulation();
+        updateBest();
+        saveToHistory();
     }
 
-    private void initPopulation() {
+    private void initializePopulation() {
         for (int i = 0; i < populationSize; i++) {
             population.add(new Individual(geneLength));
         }
-        updateBest();
     }
 
     public void evolve() {
@@ -62,24 +42,27 @@ public class GeneticAlgorithm {
         population = newPopulation;
         generation++;
         updateBest();
-        
-        history.add(new ArrayList<>(population));  // Guardar generación
-        calculateAverageFitness();
-        updateTopIndividuals();
+        saveToHistory();
+    }
+
+    private void saveToHistory() {
+        if (recentHistory.size() >= MAX_HISTORY) {
+            recentHistory.poll();  // Remove oldest generation
+        }
+        recentHistory.offer(new ArrayList<>(population)); // Add current generation
     }
 
     private Individual selectParent() {
         Random rand = new Random();
-        Individual ind1 = population.get(rand.nextInt(populationSize));
-        Individual ind2 = population.get(rand.nextInt(populationSize));
-        return ind1.getFitness() > ind2.getFitness() ? ind1 : ind2;
+        Individual a = population.get(rand.nextInt(populationSize));
+        Individual b = population.get(rand.nextInt(populationSize));
+        return a.getFitness() > b.getFitness() ? a : b;
     }
 
-    private Individual crossover(Individual parent1, Individual parent2) {
-        Random rand = new Random();
-        int crossoverPoint = rand.nextInt(geneLength);
-        String part1 = parent1.getGenes().substring(0, crossoverPoint);
-        String part2 = parent2.getGenes().substring(crossoverPoint);
+    private Individual crossover(Individual p1, Individual p2) {
+        int point = new Random().nextInt(geneLength);
+        String part1 = p1.getGenes().substring(0, point);
+        String part2 = p2.getGenes().substring(point);
         return new Individual(part1 + part2);
     }
 
@@ -87,54 +70,8 @@ public class GeneticAlgorithm {
         best = Collections.max(population, Comparator.comparingInt(Individual::getFitness));
     }
 
-    private void calculateAverageFitness() {
-        double total = 0;
-        for (Individual ind : population) {
-            total += ind.getFitness();
-        }
-        avgFitnessPerGeneration.put(generation, total / populationSize);
-    }
-    
-
-    private void updateTopIndividuals() {
-        for (Individual ind : population) {
-            if (topIndividuals.size() < 5) {
-                topIndividuals.offer(ind);
-            } else if (ind.getFitness() > topIndividuals.peek().getFitness()) {
-                topIndividuals.poll();
-                topIndividuals.offer(ind);
-            }
-        }
-    }
-
-
-    public void saveFitnessHistory(String filename) {
-        try (PrintWriter pw = new PrintWriter(new FileWriter(filename))) {
-            pw.println("Generación,FitnessPromedio");
-            for (Map.Entry<Integer, Double> entry : avgFitnessPerGeneration.entrySet()) {
-                pw.println(entry.getKey() + "," + entry.getValue());
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    // getters para usar estas estructuras
-
-    public List<List<Individual>> getHistory() {
-        return history;
-    }
-
-    public Map<Integer, Double> getAvgFitnessPerGeneration() {
-        return avgFitnessPerGeneration;
-    }
-
-    public List<Individual> getTopIndividuals() {
-        return new ArrayList<>(topIndividuals);
-    }
-
-    public int getGeneration() {
-        return generation;
+    public Queue<List<Individual>> getRecentHistory() {
+        return recentHistory;
     }
 
     public Individual getBestIndividual() {
@@ -143,5 +80,9 @@ public class GeneticAlgorithm {
 
     public List<Individual> getPopulation() {
         return population;
+    }
+
+    public int getGeneration() {
+        return generation;
     }
 }
